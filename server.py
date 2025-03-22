@@ -1,5 +1,6 @@
 from os import getenv
 
+import requests
 from dotenv import dotenv_values
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
@@ -8,13 +9,17 @@ from pymongo import MongoClient
 
 
 from langchain_openai import ChatOpenAI
-from pydantic import SecretStr
 from langgraph.prebuilt import create_react_agent
 
 from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
+from typing import List, Dict, TypedDict
 
 load_dotenv()
+HOTEL_API_URL = getenv("HOTEL_API_URL")
+HOTEL_API_KEY = getenv("HOTEL_API_KEY")
+API_HEADERS={"Authorization":f"Token {HOTEL_API_KEY}"}
+
 if getenv("LLM_MODEL")== "CHATGPT":
     model = ChatOpenAI(model="gpt-4o-mini")
 
@@ -44,16 +49,83 @@ def create_client(phone):
 @tool
 def get_spas():
     """list all available spas arround the hotel"""
+    return requests.get(HOTEL_API_URL+"/api/spas", headers=API_HEADERS).text
 
-tools = [get_weather]
+@tool
+def list_meals():
+    """list all available meals available in the restaurants"""
+    return requests.get(HOTEL_API_URL+"/api/meals", headers=API_HEADERS).text
+
+@tool
+def list_reservations():
+    """list all reservations in the restaurants"""
+    return requests.get(HOTEL_API_URL+"/api/reservations", headers=API_HEADERS).text
+
+@tool
+def add_reservation():
+    """list all available spas arround the hotel"""
+
+@tool
+def get_reservation():
+    """list all available spas arround the hotel"""
+
+@tool
+def delete_reservation():
+    """list all available spas arround the hotel"""
+
+@tool
+def list_restaurants():
+    """list all available restaurants in the hotel available for reservation"""
+    return requests.get(HOTEL_API_URL+"/api/restaurants", headers=API_HEADERS).text
+
+
+
+class SpaInfo(TypedDict):
+    name: str
+    description: str
+    location: str
+    phone_number: str
+    email: str
+    opening_hours: str
+
+
+@tool
+def display_spa_data(
+       spa: SpaInfo
+):
+    """When the user ask details about a spa, always respond using this tool"""
+    print("show_spa_data")
+    session = database.sessions.find_one({"sid": request.sid})
+    print(session["token"])
+    add_structured_message("spa_details",spa)
+
+@tool
+def display_spa_list(
+        spas: List[SpaInfo]
+):
+    """When the user ask details about a spa, always respond using this tool"""
+    print("show_spa_data")
+    session = database.sessions.find_one({"sid": request.sid})
+    print(session["token"])
+    add_structured_message("spa_list",spas)
+
+
+tools = [
+    get_weather,
+    get_spas,
+    display_spa_data,
+    display_spa_list,
+    list_meals,
+    list_reservations,
+    list_restaurants
+]
 
 
 def call_agent(user_input: str, session):
     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}, {"configurable": {"thread_id": session["_id"]}}):
-        print("============new event=================")
         for value in event.values():
             if type(value["messages"][-1]) == AIMessage and value["messages"][-1].content != '':
-                add_message(session, "agent", value["messages"][-1].content)
+                add_message("agent", value["messages"][-1].content)
 
 
 
@@ -139,6 +211,10 @@ Guest: "Where can I find a good spa nearby?"
 Response: [Provide information about hotel spa and nearby options]
 
 Always aim to enhance the guest experience through helpful, accurate, and pleasant service.
+
+## Structured response
+Some data can be returned to the user using the corresponding tool,
+if a tool is available to return structured data, use it then respond with "Here is your response"
 """
 
 
@@ -171,20 +247,33 @@ def handle_chat(data):
 
     if "message" not in data:
         return
-    print('received message: ')
-    print(data)
-    print(data["message"])
 
-    add_message(session, "user", data["message"])
+    add_message( "user", data["message"])
 
-    # if data["message"] == "test":
+    if data["message"] == "test":
+        emit('ask_question', {
+            "question": "comment ça va",
+            "responses": [
+              {
+                "value": "good",
+                "label": "Je vais bien",
+                "type": "info"
+              },
+              {
+                "value": "bad",
+                "label": "Je vais pas bien",
+                "type": "danger"
+              }
+            ]
+          }
+        , to=session["sid"])
+        return
 
     call_agent(data["message"], session)
 
 
 @sio.on('connect')
 def handle_connect(auth = None):
-    print(auth)
     if auth is None or "token" not in auth:
         return
     session = database.sessions.find_one({"token": auth["token"]})
@@ -195,14 +284,25 @@ def handle_connect(auth = None):
     session["sid"] = request.sid
     update_session(session)
     send_history(session)
-    print(session)
 
 
 
-def add_message(session, from_name, content):
+def add_message(from_name, content):
+    session = database.sessions.find_one({"sid": request.sid})
     session["history"].append({
         "from": from_name,
-        "message": content
+        "type": "message",
+        "content": content
+    })
+    update_session(session)
+    send_history(session)
+
+def add_structured_message(message_type, content):
+    session = database.sessions.find_one({"sid": request.sid})
+    session["history"].append({
+        "from": "agent",
+        "type": message_type,
+        "content": content
     })
     update_session(session)
     send_history(session)
