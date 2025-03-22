@@ -48,6 +48,11 @@ def extract_events():
             desc_span = event_item.find('span', class_='mdesc more')
             event_data['description'] = desc_span.get_text(strip=True) if desc_span else None
             
+            # Extract link
+            expanded_info_div = event_item.find('div', class_='row event-expanded-infos')
+            event_link = expanded_info_div.find('a', class_='btn btn-red') if expanded_info_div else None
+            event_data['link'] = event_link['href'] if event_link and 'href' in event_link.attrs else None
+            
             events.append(event_data)
     
     return events

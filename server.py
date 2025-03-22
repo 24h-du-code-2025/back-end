@@ -5,7 +5,7 @@ from dotenv import dotenv_values
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
 from langchain_core.messages import AIMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from pymongo import MongoClient
 
 from langchain_core.tools import tool
@@ -35,13 +35,7 @@ OPEN_WEATHER_API_KEY = getenv('OPEN_WEATHER_API_KEY')
 def get_weather(city):
     """Use this to predict weather information for a given city"""
     return get_weather_info(OPEN_WEATHER_API_KEY, city)
-    
-    
-@tool
-def make_reservation(time: str, table_number: int, guest_id: str):
-    """Make a reservation by printing reservation details."""
-    print(f"Reservation created: Time - {time}, Table Number - {table_number}, Guest ID - {guest_id}")
-    return f"Reservation confirmed for guest {guest_id} at {time} on table {table_number}."
+
 
 @tool
 def create_client(phone):
@@ -65,23 +59,42 @@ def list_reservations():
     return requests.get(HOTEL_API_URL+"/api/reservations", headers=API_HEADERS).text
 
 
+def get_available_restaurant_ids() -> List[int]:
+    """Fetch the list of available restaurant IDs from the API"""
+    response = requests.get(f"{HOTEL_API_URL}/api/restaurants", headers=API_HEADERS)
+    if response.status_code == 200:
+        data = response.json()
+        return [restaurant["id"] for restaurant in data["results"]]
+    return []
+
+
+AVAILABLE_RESTAURANT_IDS = get_available_restaurant_ids()
 
 
 class ReservationInfo(BaseModel):
-    client_id: int = Field(description="the client id in the hotel api")
-    date: int = Field(description="the date for  the reservation")
-    meal_id: int = Field(description="the id of the meal in the hotel api")
-    restaurent_id: int = Field(description="the id of the restaurant in the hotel api")
+    date: int = Field(description="the date for the reservation")
+    meal: int = Field(description="the id of the meal in the hotel api")
+    restaurant: int = Field(description="the id of the restaurant in the hotel api")
     number_of_guests: int = Field(description="the number of guests for the reservation")
-    special_requests: int = Field(description="any additional info or special request about the reservation", examples=["next to the entrance", "near the toilets", "2 persons are vegetarians"])
+    special_requests: str = Field(description="any additional info or special request about the reservation", examples=["next to the entrance", "near the toilets", "2 persons are vegetarians"])
+
+    @validator("restaurant")
+    def validate_restaurant_id(cls, value):
+        """Check if the restaurant ID is in the available list"""
+        if value not in AVAILABLE_RESTAURANT_IDS:
+            raise ValueError(f"Restaurant with id {value} does not exist.")
+        return value
+
 
 @tool
-def add_reservation():
-    """list all available spas arround the hotel"""
+def add_reservation(reservation: ReservationInfo):
+    """Create a restaurant reservation"""
+    return requests.post(HOTEL_API_URL + "/api/reservations", json=reservation.dict(), headers=API_HEADERS).text
 
 @tool
-def get_reservation():
-    """list all available spas arround the hotel"""
+def get_reservation(reservation_id: int):
+    """Get information about a restaurant reservation"""
+    return requests.post(HOTEL_API_URL + f"/api/reservations/{reservation_id}", headers=API_HEADERS).text
 
 @tool
 def delete_reservation():
@@ -129,6 +142,7 @@ class EventInfo(TypedDict):
     category: str|None
     description: str|None
     image_url: str|None
+    link: str|None
     
 
 @tool
