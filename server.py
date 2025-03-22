@@ -14,9 +14,14 @@ from langgraph.prebuilt import create_react_agent
 from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
 
+from utils import get_weather_info
+
+
 load_dotenv()
 if getenv("LLM_MODEL")== "CHATGPT":
     model = ChatOpenAI(model="gpt-4o-mini")
+    
+OPEN_WEATHER_API_KEY = getenv('OPEN_WEATHER_API_KEY')
 
 
 # For this tutorial we will use custom tool that returns pre-defined values for weather in two cities (NYC & SF)
@@ -27,14 +32,16 @@ from langchain_core.tools import tool
 
 
 @tool
-def get_weather(city: Literal["nyc", "sf"]):
-    """Use this to get weather information."""
-    if city == "nyc":
-        return "It might be cloudy in nyc"
-    elif city == "sf":
-        return "It's always sunny in sf"
-    else:
-        raise AssertionError("Unknown city")
+def get_weather(city, hours = 0):
+    """Use this to predict weather information for a given city"""
+    return get_weather_info(OPEN_WEATHER_API_KEY, city)
+    
+    
+@tool
+def make_reservation(time: str, table_number: int, guest_id: str):
+    """Make a reservation by printing reservation details."""
+    print(f"Reservation created: Time - {time}, Table Number - {table_number}, Guest ID - {guest_id}")
+    return f"Reservation confirmed for guest {guest_id} at {time} on table {table_number}."
 
 @tool
 def create_client(phone):
@@ -45,7 +52,7 @@ def create_client(phone):
 def get_spas():
     """list all available spas arround the hotel"""
 
-tools = [get_weather]
+tools = [get_weather, make_reservation]
 
 
 def call_agent(user_input: str, session):
