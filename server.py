@@ -7,15 +7,16 @@ from flask_socketio import SocketIO, emit
 from langchain_core.messages import AIMessage
 from pymongo import MongoClient
 
-
+from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
-from typing import List, Dict, TypedDict
+from typing import List, Dict
+from typing_extensions import TypedDict
 
-from utils import get_weather_info
+from utils import get_weather_info, extract_events
 
 
 load_dotenv()
@@ -29,15 +30,8 @@ if getenv("LLM_MODEL")== "CHATGPT":
 OPEN_WEATHER_API_KEY = getenv('OPEN_WEATHER_API_KEY')
 
 
-# For this tutorial we will use custom tool that returns pre-defined values for weather in two cities (NYC & SF)
-
-from typing import Literal
-
-from langchain_core.tools import tool
-
-
 @tool
-def get_weather(city, hours = 0):
+def get_weather(city):
     """Use this to predict weather information for a given city"""
     return get_weather_info(OPEN_WEATHER_API_KEY, city)
     
@@ -87,7 +81,6 @@ def list_restaurants():
     return requests.get(HOTEL_API_URL+"/api/restaurants", headers=API_HEADERS).text
 
 
-
 class SpaInfo(TypedDict):
     name: str
     description: str
@@ -105,7 +98,7 @@ def display_spa_data(
     print("show_spa_data")
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
-    add_structured_message("spa_details",spa)
+    add_structured_message("spa_details", spa)
 
 @tool
 def display_spa_list(
@@ -115,7 +108,30 @@ def display_spa_list(
     print("show_spa_data")
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
-    add_structured_message("spa_list",spas)
+    add_structured_message("spa_list", spas)
+    
+    
+class EventInfo(TypedDict):
+    title: str
+    date: str
+    category: str
+    description: str
+    image_url: str
+    
+
+@tool
+def display_events(
+    events: List[EventInfo]
+):
+    """When the user ask details about upcoming events or news in Le Mans, always respond using this tool"""
+    print("show_events")
+    add_structured_message("events_list", events)
+    
+    
+@tool
+def get_events():
+    """List upcoming events and news in Le Mans"""
+    return extract_events()
 
 
 tools = [
@@ -125,7 +141,9 @@ tools = [
     display_spa_list,
     list_meals,
     list_reservations,
-    list_restaurants
+    list_restaurants,
+    get_events,
+    display_events
 ]
 
 
