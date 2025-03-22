@@ -131,7 +131,9 @@ def display_events(
 @tool
 def get_events():
     """List upcoming events and news in Le Mans"""
-    return extract_events()
+    extracted_events = extract_events()
+    print(extracted_events)
+    return extracted_events
 
 
 tools = [
