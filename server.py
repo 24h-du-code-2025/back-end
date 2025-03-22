@@ -5,6 +5,7 @@ from dotenv import dotenv_values
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
 from langchain_core.messages import AIMessage
+from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
 from langchain_core.tools import tool
@@ -63,6 +64,17 @@ def list_reservations():
     """list all reservations in the restaurants"""
     return requests.get(HOTEL_API_URL+"/api/reservations", headers=API_HEADERS).text
 
+
+
+
+class ReservationInfo(BaseModel):
+    client_id: int = Field(description="the client id in the hotel api")
+    date: int = Field(description="the date for  the reservation")
+    meal_id: int = Field(description="the id of the meal in the hotel api")
+    restaurent_id: int = Field(description="the id of the restaurant in the hotel api")
+    number_of_guests: int = Field(description="the number of guests for the reservation")
+    special_requests: int = Field(description="any additional info or special request about the reservation", examples=["next to the entrance", "near the toilets", "2 persons are vegetarians"])
+
 @tool
 def add_reservation():
     """list all available spas arround the hotel"""
@@ -94,29 +106,29 @@ class SpaInfo(TypedDict):
 def display_spa_data(
        spa: SpaInfo
 ):
-    """When the user ask details about a spa, always respond using this tool"""
-    print("show_spa_data")
+    """When the user ask details about a spa and there is only one spa to display, always respond using this tool"""
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_details", spa)
+    return "__end__"
 
 @tool
 def display_spa_list(
         spas: List[SpaInfo]
 ):
-    """When the user ask details about a spa, always respond using this tool"""
-    print("show_spa_data")
+    """When the user ask about spas and there is a list to display, always respond using this tool"""
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_list", spas)
-    
+    return "__end__"
+
     
 class EventInfo(TypedDict):
-    title: str
-    date: str
-    category: str
-    description: str
-    image_url: str
+    title: str|None
+    date: str|None
+    category: str|None
+    description: str|None
+    image_url: str|None
     
 
 @tool
@@ -126,11 +138,13 @@ def display_events(
     """When the user ask details about upcoming events or news in Le Mans, always respond using this tool"""
     print("show_events")
     add_structured_message("events_list", events)
+    return "__end__"
     
     
 @tool
 def get_events():
     """List upcoming events and news in Le Mans"""
+    print("get_events")
     return extract_events()
 
 
