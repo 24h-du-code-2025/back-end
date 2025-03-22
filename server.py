@@ -1,3 +1,5 @@
+from os import getenv
+
 from dotenv import dotenv_values
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
@@ -13,8 +15,8 @@ from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
 
 load_dotenv()
-
-model = ChatOpenAI(model="gpt-4o-mini", api_key=SecretStr("sk-pmsYoz6GaUUZSmrSlj3av3Muk9LF7IuBcPATqMt-jpT3BlbkFJ06EzKNCaZodM0clJLXNS6T71mSsFXrvYD6-CMkCCQA"))
+if getenv("LLM_MODEL")== "CHATGPT":
+    model = ChatOpenAI(model="gpt-4o-mini")
 
 
 # For this tutorial we will use custom tool that returns pre-defined values for weather in two cities (NYC & SF)
@@ -174,6 +176,8 @@ def handle_chat(data):
     print(data["message"])
 
     add_message(session, "user", data["message"])
+
+    # if data["message"] == "test":
 
     call_agent(data["message"], session)
 
