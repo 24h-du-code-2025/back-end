@@ -9,3 +9,4 @@ python-dotenv~=1.0.1
 typing_extensions~=4.12.2
 langgraph~=0.3.18
 langchain-core~=0.3.47
+requests~=2.32.3
