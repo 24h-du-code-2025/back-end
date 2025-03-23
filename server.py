@@ -1,12 +1,15 @@
 from os import getenv
+import os
 
 import requests
 from dotenv import dotenv_values
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel, Field, validator
 from pymongo import MongoClient
+import whisper
+import ffmpeg
 
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -30,6 +33,8 @@ elif  getenv("LLM_MODEL") == "CHATGPT_BLING":
     model = ChatOpenAI(model="gpt-4o")
 
 OPEN_WEATHER_API_KEY = getenv('OPEN_WEATHER_API_KEY')
+
+speech_to_text_model = whisper.load_model("base")
 
 
 @tool
@@ -439,6 +444,56 @@ connected_users = []
 @app.route("/")
 def hello_world():
     return "<p>Hello, World!</p>"
+
+
+def convert_mp3_to_wav(mp3_file, wav_file=None):
+    """
+    Converts an MP3 file to WAV format using ffmpeg.
+    
+    Args:
+        mp3_file (str): Path to the input MP3 file.
+        wav_file (str, optional): Path to save the WAV file. 
+                                  If None, it saves with the same name as input file.
+    
+    Returns:
+        str: Path to the output WAV file.
+    """
+    if wav_file is None:
+        wav_file = mp3_file.replace(".mp3", ".wav")
+
+    try:
+        # Use ffmpeg to convert MP3 to WAV
+        ffmpeg.input(mp3_file).output(wav_file, format='wav').run(overwrite_output=True, quiet=True)
+        return wav_file
+    except Exception as e:
+        print(f"Error converting {mp3_file} to WAV: {e}")
+        return None
+
+
+@app.route("/convert-speech-to-text")
+def convert_speech_to_text():
+    
+    if 'audio' not in request.files:
+        return jsonify({"error": "No audio file uploaded"}), 400
+    
+    audio_file = request.files['audio']
+    
+    if not audio_file.filename.endswith(('.mp3', '.wav', '.m4a', '.ogg')):
+        return jsonify({"error": "Invalid file format. Please upload an MP3, WAV, M4A, or OGG file."}), 400
+
+    temp_audio_path = f"temp_{audio_file.filename}"
+    audio_file.save(temp_audio_path)
+
+    if temp_audio_path.endswith('.mp3'):
+        wav_path = convert_mp3_to_wav(temp_audio_path)
+
+    try:
+        result = model.transcribe(wav_path)
+        os.remove(wav_path)  # Clean up temporary file
+        return jsonify({"text": result["text"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 
 
 @sio.on('chat')
