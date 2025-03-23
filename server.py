@@ -14,7 +14,7 @@ from langgraph.prebuilt import create_react_agent
 
 from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
-from typing import List, Dict
+from typing import List, Dict, Optional
 from typing_extensions import TypedDict
 
 from utils import get_weather_info, extract_events
@@ -38,6 +38,42 @@ def get_weather(city):
 
 
 @tool
+def get_client(client_id):
+    """get information about client by its id"""
+    return requests.get(HOTEL_API_URL + f"/api/clients/{client_id}/", headers=API_HEADERS).text
+
+
+
+class UpdateClientInfo(BaseModel):
+    client_id: int = Field(description="client id")
+    name: int = Field(description="client name")
+    phone_number: int = Field(description="client phone number")
+    room_number: int = Field(description="client room number")
+    special_requests: str = Field(description="client special requests")
+
+
+@tool
+def update_client(update_info: UpdateClientInfo):
+    """update client information"""
+    body_parameters = update_info.dict()
+    client_id = update_info.client_id
+    if 'client_id' in body_parameters:
+        del body_parameters['client_id']
+    return requests.update(
+        HOTEL_API_URL + f"/api/clients/{client_id}/",
+        headers=API_HEADERS,
+        json=body_parameters
+    ).text
+    
+
+
+@tool
+def delete_client(client_id):
+    """delete client by its id"""
+    requests.delete(HOTEL_API_URL + f"/api/clients/{client_id}/", headers=API_HEADERS)
+
+
+@tool
 def create_client(phone):
     """register a user"""
 
@@ -45,23 +81,24 @@ def create_client(phone):
 @tool
 def get_spas():
     """list all available spas arround the hotel"""
-    return requests.get(HOTEL_API_URL+"/api/spas", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL+"/api/spas/", headers=API_HEADERS).text
 
 
 @tool
 def list_meals():
     """list all available meals available in the restaurants"""
-    return requests.get(HOTEL_API_URL+"/api/meals", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL+"/api/meals/", headers=API_HEADERS).text
+
 
 @tool
 def list_reservations():
     """list all reservations in the restaurants"""
-    return requests.get(HOTEL_API_URL+"/api/reservations", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL+"/api/reservations/", headers=API_HEADERS).text
 
 
 def get_available_restaurant_ids() -> List[int]:
     """Fetch the list of available restaurant IDs from the API"""
-    response = requests.get(f"{HOTEL_API_URL}/api/restaurants", headers=API_HEADERS)
+    response = requests.get(f"{HOTEL_API_URL}/api/restaurants/", headers=API_HEADERS)
     if response.status_code == 200:
         data = response.json()
         return [restaurant["id"] for restaurant in data["results"]]
@@ -89,12 +126,29 @@ class ReservationInfo(BaseModel):
 @tool
 def add_reservation(reservation: ReservationInfo):
     """Create a restaurant reservation"""
-    return requests.post(HOTEL_API_URL + "/api/reservations", json=reservation.dict(), headers=API_HEADERS).text
+    return requests.post(HOTEL_API_URL + "/api/reservations/", json=reservation.dict(), headers=API_HEADERS).text
 
 @tool
 def get_reservation(reservation_id: int):
     """Get information about a restaurant reservation"""
-    return requests.post(HOTEL_API_URL + f"/api/reservations/{reservation_id}", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", headers=API_HEADERS).text
+
+
+class GetReservationsParams(BaseModel):
+    client: str  # Required parameter
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    meal: Optional[str] = None
+    page: Optional[int] = None
+    query: Optional[str] = None
+
+
+@tool
+def get_reservations(params: GetReservationsParams):
+    """Get information about client reservations"""
+    params_dict = {k: v for k, v in params.dict().items() if v is not None}
+    return requests.post(HOTEL_API_URL + f"/api/reservations", params=params_dict, headers=API_HEADERS).text
+
 
 @tool
 def delete_reservation():
@@ -170,8 +224,13 @@ tools = [
     list_meals,
     list_reservations,
     list_restaurants,
+    add_reservation,
+    get_reservation,
     get_events,
-    display_events
+    display_events,
+    get_client,
+    update_client,
+    delete_client
 ]
 
 
