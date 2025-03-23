@@ -19,15 +19,16 @@ from typing_extensions import TypedDict
 
 from utils import get_weather_info, extract_events
 
-
 load_dotenv()
 HOTEL_API_URL = getenv("HOTEL_API_URL")
 HOTEL_API_KEY = getenv("HOTEL_API_KEY")
-API_HEADERS={"Authorization":f"Token {HOTEL_API_KEY}"}
+API_HEADERS = {"Authorization": f"Token {HOTEL_API_KEY}"}
 
-if getenv("LLM_MODEL")== "CHATGPT":
+if getenv("LLM_MODEL") == "CHATGPT":
     model = ChatOpenAI(model="gpt-4o-mini")
-    
+elif  getenv("LLM_MODEL") == "CHATGPT_BLING":
+    model = ChatOpenAI(model="gpt-4o")
+
 OPEN_WEATHER_API_KEY = getenv('OPEN_WEATHER_API_KEY')
 
 
@@ -73,9 +74,38 @@ def delete_client(client_id):
     requests.delete(HOTEL_API_URL + f"/api/clients/{client_id}/", headers=API_HEADERS)
 
 
-@tool
-def create_client(phone):
-    """register a user"""
+
+
+class ClientModel(BaseModel):
+    name: str = Field(description="First and last name of the client")
+    phone_number: str = Field(description="phone number of the client")
+    room_number: Optional[str] = Field(description="the number of the room")
+    special_requests: Optional[str] = Field(description="any additional info or special request about the client and his reservation",
+                                  examples=["I need a double bed", "I will left at 10 o clock"])
+
+@tool(args_schema=ClientModel)
+def create_client(
+        name: str,
+        phone_number: str,
+        room_number: str = None,
+        special_requests: str = None
+):
+    """register a new client in the hotel"""
+    return requests.post(HOTEL_API_URL + "/api/clients/", data={
+    "name": name,
+    "phone_number": phone_number,
+    "room_number": room_number,
+    "special_requests": special_requests
+}, headers=API_HEADERS).text
+
+@tool()
+def search_client(
+        search: str,
+):
+    """search a client by his name or phone number use this tool to check if a user is already registered """
+    return requests.post(HOTEL_API_URL + "/api/clients/", params={
+    "search": search,
+}, headers=API_HEADERS).text
 
 
 @tool
@@ -123,10 +153,12 @@ class ReservationInfo(BaseModel):
         return value
 
 
+
 @tool
 def add_reservation(reservation: ReservationInfo):
     """Create a restaurant reservation"""
     return requests.post(HOTEL_API_URL + "/api/reservations/", json=reservation.dict(), headers=API_HEADERS).text
+
 
 @tool
 def get_reservation(reservation_id: int):
@@ -150,14 +182,16 @@ def get_reservations(params: GetReservationsParams):
     return requests.post(HOTEL_API_URL + f"/api/reservations", params=params_dict, headers=API_HEADERS).text
 
 
+
 @tool
 def delete_reservation():
     """list all available spas arround the hotel"""
 
+
 @tool
 def list_restaurants():
     """list all available restaurants in the hotel available for reservation"""
-    return requests.get(HOTEL_API_URL+"/api/restaurants", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL + "/api/restaurants", headers=API_HEADERS).text
 
 
 class SpaInfo(TypedDict):
@@ -171,13 +205,14 @@ class SpaInfo(TypedDict):
 
 @tool
 def display_spa_data(
-       spa: SpaInfo
+        spa: SpaInfo
 ):
     """When the user ask details about a spa and there is only one spa to display, always respond using this tool"""
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_details", spa)
     return "__end__"
+
 
 @tool
 def display_spa_list(
@@ -189,26 +224,26 @@ def display_spa_list(
     add_structured_message("spa_list", spas)
     return "__end__"
 
-    
+
 class EventInfo(TypedDict):
-    title: str|None
-    date: str|None
-    category: str|None
-    description: str|None
-    image_url: str|None
-    link: str|None
+    title: Optional[str]
+    date: Optional[str]
+    category: Optional[str]
+    description: Optional[str]
+    image_url: Optional[str]
+    link: Optional[str]
     
 
 @tool
 def display_events(
-    events: List[EventInfo]
+        events: List[EventInfo]
 ):
     """When the user ask details about upcoming events or news in Le Mans, always respond using this tool"""
     print("show_events")
     add_structured_message("events_list", events)
     return "__end__"
-    
-    
+
+
 @tool
 def get_events():
     """List upcoming events and news in Le Mans"""
@@ -230,20 +265,23 @@ tools = [
     display_events,
     get_client,
     update_client,
-    delete_client
+    delete_client,
+    create_client,
+    search_client
 ]
 
 
 def call_agent(user_input: str, session):
-    for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}, {"configurable": {"thread_id": session["_id"]}}):
+    for event in graph.stream({"messages": [{"role": "user", "content": user_input}]},
+                              {"configurable": {"thread_id": session["_id"]}}):
         for value in event.values():
+            if value["messages"][-1].content == '__end__':
+                return
             if type(value["messages"][-1]) == AIMessage and value["messages"][-1].content != '':
                 add_message("agent", value["messages"][-1].content)
 
 
-
 memory = MemorySaver()
-
 
 sys_prompt = """
 # System Prompt: Hotel Concierge AI
@@ -325,25 +363,23 @@ Response: [Provide information about hotel spa and nearby options]
 
 Always aim to enhance the guest experience through helpful, accurate, and pleasant service.
 
+## client account
+To make any reservation or request, the user must be linked to a user account created via the create_client tool or found via the search_client tool.
+
 ## Structured response
 Some data can be returned to the user using the corresponding tool,
 if a tool is available to return structured data, use it then respond with "Here is your response"
 """
 
-
 graph = create_react_agent(model, tools=tools, checkpointer=memory, prompt=sys_prompt)
-
-
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 sio = SocketIO(app, cors_allowed_origins='*')
 
-
 config = dotenv_values(".env")
 mongodb_client = MongoClient(config["ATLAS_URI"])
 database = mongodb_client[config["DB_NAME"]]
-
 
 connected_users = []
 
@@ -353,7 +389,6 @@ def hello_world():
     return "<p>Hello, World!</p>"
 
 
-
 @sio.on('chat')
 def handle_chat(data):
     session = database.sessions.find_one({"sid": request.sid})
@@ -361,32 +396,12 @@ def handle_chat(data):
     if "message" not in data:
         return
 
-    add_message( "user", data["message"])
-
-    if data["message"] == "test":
-        emit('ask_question', {
-            "question": "comment ça va",
-            "responses": [
-              {
-                "value": "good",
-                "label": "Je vais bien",
-                "type": "info"
-              },
-              {
-                "value": "bad",
-                "label": "Je vais pas bien",
-                "type": "danger"
-              }
-            ]
-          }
-        , to=session["sid"])
-        return
-
+    add_message("user", data["message"])
     call_agent(data["message"], session)
 
 
 @sio.on('connect')
-def handle_connect(auth = None):
+def handle_connect(auth=None):
     if auth is None or "token" not in auth:
         return
     session = database.sessions.find_one({"token": auth["token"]})
@@ -399,7 +414,6 @@ def handle_connect(auth = None):
     send_history(session)
 
 
-
 def add_message(from_name, content):
     session = database.sessions.find_one({"sid": request.sid})
     session["history"].append({
@@ -409,6 +423,7 @@ def add_message(from_name, content):
     })
     update_session(session)
     send_history(session)
+
 
 def add_structured_message(message_type, content):
     session = database.sessions.find_one({"sid": request.sid})
@@ -420,13 +435,12 @@ def add_structured_message(message_type, content):
     update_session(session)
     send_history(session)
 
+
 def update_session(session):
-    database["sessions"].update_one({"_id": session["_id"]}, { "$set": session })
+    database["sessions"].update_one({"_id": session["_id"]}, {"$set": session})
 
 
 def send_history(session):
-    emit('update_history', session["history"],  to=session["sid"])
+    emit('update_history', session["history"], to=session["sid"])
 
 # def prompt_user(question, answers):
-
-
