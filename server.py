@@ -39,31 +39,31 @@ def get_weather(city):
 
 
 @tool
+def get_clients(page: Optional[int], term: Optional[str]):
+    """Searches for clients using a provided search term"""
+    return requests.get(HOTEL_API_KEY + f"/api/clients/", params={"page": page, term: "term"}, headers=API_HEADERS).text
+
+
+@tool
 def get_client(client_id):
     """get information about client by its id"""
     return requests.get(HOTEL_API_URL + f"/api/clients/{client_id}/", headers=API_HEADERS).text
 
 
-
 class UpdateClientInfo(BaseModel):
-    client_id: int = Field(description="client id")
-    name: str = Field(description="client name")
-    phone_number: str = Field(description="client phone number")
-    room_number: str = Field(description="client room number")
-    special_requests: str = Field(description="client special requests")
+    name: Optional[str]
+    phone_number: Optional[str]
+    room_number: Optional[str]
+    special_requests: Optional[str]
 
 
 @tool
-def update_client(update_info: UpdateClientInfo):
+def update_client(client_id: int, update_info: UpdateClientInfo):
     """update client information"""
-    body_parameters = update_info.dict()
-    client_id = update_info.client_id
-    if 'client_id' in body_parameters:
-        del body_parameters['client_id']
-    return requests.update(
+    return requests.put(
         HOTEL_API_URL + f"/api/clients/{client_id}/",
         headers=API_HEADERS,
-        json=body_parameters
+        json=update_info.dict()
     ).text
     
 
@@ -71,8 +71,6 @@ def update_client(update_info: UpdateClientInfo):
 def delete_client(client_id):
     """delete client by its id"""
     requests.delete(HOTEL_API_URL + f"/api/clients/{client_id}/", headers=API_HEADERS)
-
-
 
 
 class ClientModel(BaseModel):
@@ -163,20 +161,14 @@ def display_reservation_data(
     add_structured_message("reservation_details", reservation.dict())
     return "__end__"
 
+
 class ReservationInfo(BaseModel):
-    date: int = Field(description="the date for the reservation")
-    meal: int = Field(description="the id of the meal in the hotel api")
-    restaurant: int = Field(description="the id of the restaurant in the hotel api")
-    number_of_guests: int = Field(description="the number of guests for the reservation")
-    special_requests: str = Field(description="any additional info or special request about the reservation", examples=["next to the entrance", "near the toilets", "2 persons are vegetarians"])
-
-    @validator("restaurant")
-    def validate_restaurant_id(cls, value):
-        """Check if the restaurant ID is in the available list"""
-        if value not in AVAILABLE_RESTAURANT_IDS:
-            raise ValueError(f"Restaurant with id {value} does not exist.")
-        return value
-
+    client: int
+    date: str
+    meal: int
+    restaurant: int
+    number_of_guests: int
+    special_requests: Optional[str]
 
 
 @tool
@@ -203,23 +195,22 @@ class GetReservationsParams(BaseModel):
 @tool
 def get_reservations(params: GetReservationsParams):
     """Get information about client reservations"""
-    params_dict = {k: v for k, v in params.dict().items() if v is not None}
-    return requests.post(HOTEL_API_URL + f"/api/reservations", params=params_dict, headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL + f"/api/reservations/", params=params, headers=API_HEADERS).text
 
 
 class UpdateReservationsParams(BaseModel):
-    client: Optional[int] = None
-    restaurant: Optional[int] = None
-    date: Optional[str] = None
-    meal: Optional[int] = None
-    number_of_guests: Optional[int] = None
-    special_requests: Optional[str] = None
+    client: int = None
+    restaurant: int = None
+    date: str = None
+    meal: int = None
+    number_of_guests: int = None
+    special_requests: str = None
 
 
 @tool
 def update_reservation(reservation_id: int, params: UpdateReservationsParams):
     """Update reservation information"""
-    return requests.put(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", params=params, headers=API_HEADERS).text
+    return requests.put(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", json=params.dict(), headers=API_HEADERS).text
 
 
 class PatchReservationsParams(BaseModel):
@@ -234,14 +225,13 @@ class PatchReservationsParams(BaseModel):
 @tool
 def patch_reservation(reservation_id: int, params: PatchReservationsParams):
     """Partially update reservation information"""
-    return requests.patch(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", params=params, headers=API_HEADERS).text
+    return requests.patch(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", json=params.dict(), headers=API_HEADERS).text
 
 
 @tool
 def delete_reservation(reservation_id: int):
     """list all available spas arround the hotel"""
-    return requests.delete(HOTEL_API_URL + f"/api/reservations/{reservation_id}", headers=API_HEADERS).text
-    
+    return requests.delete(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", headers=API_HEADERS).text
 
 
 @tool
@@ -324,6 +314,7 @@ tools = [
     get_events,
     display_events,
     get_client,
+    get_clients,
     update_client,
     delete_client,
     create_client,
