@@ -14,7 +14,7 @@ from langgraph.prebuilt import create_react_agent
 
 from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Literal
 from typing_extensions import TypedDict
 
 from utils import get_weather_info, extract_events
@@ -36,6 +36,27 @@ OPEN_WEATHER_API_KEY = getenv('OPEN_WEATHER_API_KEY')
 def get_weather(city):
     """Use this to predict weather information for a given city"""
     return get_weather_info(OPEN_WEATHER_API_KEY, city)
+
+@tool
+def display_weather(
+        city: str,
+        weather_type: Literal["sunny", "cloudy", "rain", "storm"],
+        temperature: str,
+        humidity: str,
+        wind: str,
+
+):
+    """Use this to display the weather to the user"""
+    add_structured_message("meteo", {
+    "city": city,
+    "weather_type": weather_type,
+    "temperature": temperature,
+    "humidity": humidity,
+    "wind": wind,
+    })
+    emit('set_mood', "meteo")
+
+    return "__END__"
 
 
 @tool
@@ -179,7 +200,8 @@ def display_reservation_data(
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("reservation_details", reservation.dict())
-    return "__end__"
+    emit('set_mood', "note")
+    return "__END__"
 
 
 class ReservationInfo(BaseModel):
@@ -277,7 +299,9 @@ def display_spa_data(
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_details", spa)
-    return "__end__"
+    emit('set_mood', "spa")
+
+    return "__END__"
 
 
 @tool
@@ -288,7 +312,9 @@ def display_spa_list(
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_list", spas)
-    return "__end__"
+    emit('set_mood', "spa")
+
+    return "__END__"
 
 
 class EventInfo(TypedDict):
@@ -307,7 +333,8 @@ def display_events(
     """When the user ask details about upcoming events or news in Le Mans, or if the information about an event must be displayed, always respond using this tool"""
     print("show_events")
     add_structured_message("events_list", events)
-    return "__end__"
+    emit('set_mood', "tourism")
+    return "__END__"
 
 
 @tool
@@ -319,6 +346,7 @@ def get_events():
 
 tools = [
     get_weather,
+    display_weather,
     get_spas,
     display_spa_data,
     display_spa_list,
@@ -341,17 +369,20 @@ tools = [
     search_client,
     display_reservation_data,
     send_intents,
-    stop_session
+    stop_session,
+    get_weather
 ]
 
 
 def call_agent(user_input: str, session):
+    emit('set_mood', "thinking")
     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]},
                               {"configurable": {"thread_id": session["_id"]}}):
         for value in event.values():
-            if value["messages"][-1].content == '__end__':
+            if value["messages"][-1].content == '__END__':
                 return
             if type(value["messages"][-1]) == AIMessage and value["messages"][-1].content != '':
+                emit('set_mood', "base")
                 add_message("agent", value["messages"][-1].content)
 
 
