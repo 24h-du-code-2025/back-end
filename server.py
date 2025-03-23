@@ -46,9 +46,9 @@ def get_client(client_id):
 
 class UpdateClientInfo(BaseModel):
     client_id: int = Field(description="client id")
-    name: int = Field(description="client name")
-    phone_number: int = Field(description="client phone number")
-    room_number: int = Field(description="client room number")
+    name: str = Field(description="client name")
+    phone_number: str = Field(description="client phone number")
+    room_number: str = Field(description="client room number")
     special_requests: str = Field(description="client special requests")
 
 
@@ -65,7 +65,6 @@ def update_client(update_info: UpdateClientInfo):
         json=body_parameters
     ).text
     
-
 
 @tool
 def delete_client(client_id):
@@ -135,12 +134,12 @@ def get_reservation(reservation_id: int):
 
 
 class GetReservationsParams(BaseModel):
-    client: str  # Required parameter
+    client: Optional[int] = None
     date_from: Optional[str] = None
     date_to: Optional[str] = None
-    meal: Optional[str] = None
+    meal: Optional[int] = None
     page: Optional[int] = None
-    query: Optional[str] = None
+    restaurant: Optional[int] = None
 
 
 @tool
@@ -150,14 +149,46 @@ def get_reservations(params: GetReservationsParams):
     return requests.post(HOTEL_API_URL + f"/api/reservations", params=params_dict, headers=API_HEADERS).text
 
 
+class UpdateReservationsParams(BaseModel):
+    client: Optional[int] = None
+    restaurant: Optional[int] = None
+    date: Optional[str] = None
+    meal: Optional[int] = None
+    number_of_guests: Optional[int] = None
+    special_requests: Optional[str] = None
+
+
 @tool
-def delete_reservation():
+def update_reservation(reservation_id: int, params: UpdateReservationsParams):
+    """Update reservation information"""
+    return requests.put(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", params=params, headers=API_HEADERS).text
+
+
+class PatchReservationsParams(BaseModel):
+    client: Optional[int] = None
+    restaurant: Optional[int] = None
+    date: Optional[str] = None
+    meal: Optional[int] = None
+    number_of_guests: Optional[int] = None
+    special_requests: Optional[str] = None
+
+
+@tool
+def patch_reservation(reservation_id: int, params: PatchReservationsParams):
+    """Partially update reservation information"""
+    return requests.patch(HOTEL_API_URL + f"/api/reservations/{reservation_id}/", params=params, headers=API_HEADERS).text
+
+
+@tool
+def delete_reservation(reservation_id: int):
     """list all available spas arround the hotel"""
+    return requests.delete(HOTEL_API_URL + f"/api/reservations/{reservation_id}", headers=API_HEADERS).text
+    
 
 @tool
 def list_restaurants():
     """list all available restaurants in the hotel available for reservation"""
-    return requests.get(HOTEL_API_URL+"/api/restaurants", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL+"/api/restaurants/", headers=API_HEADERS).text
 
 
 class SpaInfo(TypedDict):
@@ -226,6 +257,10 @@ tools = [
     list_restaurants,
     add_reservation,
     get_reservation,
+    get_reservations,
+    update_reservation,
+    patch_reservation,
+    delete_reservation,
     get_events,
     display_events,
     get_client,
