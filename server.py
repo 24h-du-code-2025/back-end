@@ -103,7 +103,7 @@ def search_client(
         search: str,
 ):
     """search a client by his name or phone number use this tool to check if a user is already registered """
-    return requests.post(HOTEL_API_URL + "/api/clients/", params={
+    return requests.get(HOTEL_API_URL + "/api/clients/", params={
     "search": search,
 }, headers=API_HEADERS).text
 
@@ -137,6 +137,32 @@ def get_available_restaurant_ids() -> List[int]:
 
 AVAILABLE_RESTAURANT_IDS = get_available_restaurant_ids()
 
+"""
+    "id": 0,
+    "client": 0,
+    "restaurant": 0,
+    "date": "2019-08-24",
+    "meal": 0,
+    "number_of_guests": 1,
+    "special_requests": "string"
+"""
+class ReservationDesplayInfo(BaseModel):
+    restaurant_name: str = Field(description="the name of the restaurant")
+    restaurant_location: str = Field(description="address of the restaurant")
+    reservation_date: str = Field(description="the date and hour of the reservation")
+    meal: str = Field(description="the name of the meal reserved")
+    number_of_guests: int = Field(description="the number of guests for the reservation")
+    special_requests: Optional[str] = Field(description="Other informations about the reservation")
+
+@tool
+def display_reservation_data(
+        reservation: ReservationDesplayInfo
+):
+    """When a reservation is created or the user ask about the details of a reservation, always respond using this tool"""
+    session = database.sessions.find_one({"sid": request.sid})
+    print(session["token"])
+    add_structured_message("reservation_details", reservation.dict())
+    return "__end__"
 
 class ReservationInfo(BaseModel):
     date: int = Field(description="the date for the reservation")
@@ -267,7 +293,8 @@ tools = [
     update_client,
     delete_client,
     create_client,
-    search_client
+    search_client,
+    display_reservation_data
 ]
 
 
