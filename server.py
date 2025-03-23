@@ -118,9 +118,29 @@ def list_meals():
 
 
 @tool
-def list_reservations():
+def list_reservations(page: int = 1):
     """list all reservations in the restaurants"""
-    return requests.get(HOTEL_API_URL+"/api/reservations/", headers=API_HEADERS).text
+    return requests.get(HOTEL_API_URL+"/api/reservations/", params={"page": page}, headers=API_HEADERS).text
+
+
+
+class IntentModel(BaseModel):
+    title: str = Field(description="Label of the action to display to the user")
+    prompt: str = Field(description="prompt that will be sent to the agent if the user choose this intent")
+
+@tool
+def send_intents(intents: List[IntentModel]):
+    """Generate personalized prompt suggestions when users don't provide a specific question. This tool proactively offers a list of conversation starters, helping overcome the blank page problem and encouraging meaningful interactions."""
+    print("send_intents")
+    add_structured_message("propose_intents", [intent.dict() for intent in intents])
+    return "__END__"
+
+
+@tool
+def stop_session():
+    """Session Termination Tool: Ends the active session when all user requests have been successfully addressed, or when the user explicitly signals a desire to conclude the interaction through farewell messages, explicit end commands, or natural conversation closing signals. This tool ensures proper session closure, saving state when appropriate, and delivering a courteous final response to maintain a positive user experience."""
+    emit('end_session')
+
 
 
 def get_available_restaurant_ids() -> List[int]:
@@ -253,7 +273,7 @@ class SpaInfo(TypedDict):
 def display_spa_data(
         spa: SpaInfo
 ):
-    """When the user ask details about a spa and there is only one spa to display, always respond using this tool"""
+    """When the user ask details about a spa and there is only one spa to display or if the information about a spa must be displayed, always respond using this tool"""
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_details", spa)
@@ -264,7 +284,7 @@ def display_spa_data(
 def display_spa_list(
         spas: List[SpaInfo]
 ):
-    """When the user ask about spas and there is a list to display, always respond using this tool"""
+    """When the user ask about spas and there is a list to display or if the information about a list of spas must be displayed, always respond using this tool"""
     session = database.sessions.find_one({"sid": request.sid})
     print(session["token"])
     add_structured_message("spa_list", spas)
@@ -284,7 +304,7 @@ class EventInfo(TypedDict):
 def display_events(
         events: List[EventInfo]
 ):
-    """When the user ask details about upcoming events or news in Le Mans, always respond using this tool"""
+    """When the user ask details about upcoming events or news in Le Mans, or if the information about an event must be displayed, always respond using this tool"""
     print("show_events")
     add_structured_message("events_list", events)
     return "__end__"
@@ -319,7 +339,9 @@ tools = [
     delete_client,
     create_client,
     search_client,
-    display_reservation_data
+    display_reservation_data,
+    send_intents,
+    stop_session
 ]
 
 
@@ -420,7 +442,9 @@ To make any reservation or request, the user must be linked to a user account cr
 
 ## Structured response
 Some data can be returned to the user using the corresponding tool,
-if a tool is available to return structured data, use it then respond with "Here is your response"
+if a tool is available to return structured data, use it
+try most of the time to use a tool to answer user prompts
+never display markdown data or logn texts, if there is a response containing an object or a known stucture, use a tool 
 """
 
 graph = create_react_agent(model, tools=tools, checkpointer=memory, prompt=sys_prompt)
