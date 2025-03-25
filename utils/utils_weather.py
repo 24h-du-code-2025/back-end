@@ -41,6 +41,3 @@ def get_weather_info(api_key: str, city: str):
             f"Pressure: {weather['pressure']} hPa\n"
             f"Humidity: {weather['humidity']}%\n"
             f"Coordinates: ({weather['coordinates']['latitude']}, {weather['coordinates']['longitude']})")
-
-# Example usage (Replace 'your_api_key_here' with an actual API key):
-# print(format_weather_info("New York", "your_api_key_here"))
