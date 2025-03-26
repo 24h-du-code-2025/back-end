@@ -29,14 +29,18 @@ A backend service for handling AI-driven hotel interactions using Flask, MongoDB
 
 5. **Create a `.env` file** using the `.env.dist` template and fill it with environment variables:
    ```ini
-   ATLAS_URI=mongodb://127.0.0.1/?retryWrites=true&w=majority
-   DB_NAME=hotel-california
-   OPENAI_API_KEY=
-   LLM_MODEL=
-   HOTEL_API_URL=https://app-584240518682.europe-west9.run.app
-   HOTEL_API_KEY=
-   LANGSMITH_TRACING=false
-   LANGSMITH_API_KEY=
+ATLAS_URI=mongodb://127.0.0.1/?retryWrites=true&w=majority
+DB_NAME=hotel-california
+LLM_MODEL=CHATGPT
+HOTEL_API_URL=https://app-584240518682.europe-west9.run.app/
+HOTEL_API_KEY=
+OPEN_WEATHER_API_KEY=
+OPENAI_API_KEY=
+
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT="hackaton"
    ```
 
 6. **Launch the server:**
