@@ -4,6 +4,8 @@
 
 A backend service for handling AI-driven hotel interactions using Flask, MongoDB, and OpenAI models.
 
+![Diagram](assets/diagram.png)
+
 ## 🚀 Run Application
 
 1. **Clone the repository:**
@@ -55,6 +57,7 @@ A backend service for handling AI-driven hotel interactions using Flask, MongoDB
 
 | Folder / File | Description |
 |--------------|------------|
+| [`assets/`](assets) | Application diagrams |
 | [`model/`](model) | Model classes for interacting with the hotel REST API |
 | [`prompts/`](prompts) | Prompt templates sent to the LLM |
 | [`tools/`](tools) | Function tools used by the AI agent |
