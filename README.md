@@ -1,10 +1,47 @@
-# Backend
+# Backend - AI ChatBot
 
-## Description
+Backend implementation of the AI ChatBot that won the **["24 Heures du Code"](https://les24hducode.fr/)** hackathon.
 
-A backend service for handling AI-driven hotel interactions using Flask, MongoDB, and OpenAI models.
+## 🏆 Objective
+
+The primary goal of the hackathon was to develop a chatbot to automate the reception process at **Hotel California**. Instead of clients having to ask hotel managers for information and make requests manually, they could interact with an AI-powered chatbot that handles basic management tasks seamlessly.
+
+The hackathon organizers provided a pre-developed **REST API** for the Hotel California system. The chatbot's objective was to interpret user requests in natural language and translate them into appropriate API calls.
+
+---
+
+## 🛠️ Application Overview
+
+The chatbot interacts with users via a **frontend UI**, which communicates with the backend using **WebSockets**. The backend processes user messages using the `LangGraph` framework, directing them to an **AI agent** that utilizes predefined tools to execute tasks efficiently.
+
+### 📌 How It Works:
+1. **User Input Processing**: Messages are sent to the AI agent.
+2. **Tool Invocation**: The AI agent determines the required tools based on the user’s intent.
+3. **Parameter Handling**: With the help of `pydantic`, the agent extracts relevant details and fills in missing parameters if possible.
+4. **Clarification Requests**: If user input is incomplete or unclear, the agent prompts for missing details.
+5. **API Interaction**: The necessary tool sends a request to the **Hotel California REST API**.
+6. **Response Handling**: The chatbot displays the API response to the user in the chat.
 
 ![Diagram](assets/diagram.png)
+
+### ⬇️ Core Functionalities:
+- **Client Management**
+- **Restaurant Reservations**
+- **Hotel Accommodation Information**
+- **Weather Updates**
+- **Local Events Lookup**
+
+---
+
+### 🔧 ChatBot Features
+
+✅ **Conversational Memory**: The AI agent retains message history, allowing it to provide context-aware responses.
+
+✅ **Speech Recognition**: Users can interact with the chatbot via voice input.
+
+✅ **Multilingual Support**: The chatbot understands and responds in multiple languages.
+
+---
 
 ## 🚀 Run Application
 
