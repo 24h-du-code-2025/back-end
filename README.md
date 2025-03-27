@@ -47,7 +47,7 @@ The chatbot interacts with users via a **frontend UI**, which communicates with 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/24h-du-code-2025/back-end.git <directory>
+   git clone https://github.com/24h-du-code-2025/backend.git <directory>
    ```
 
 2. **Navigate to the repository directory:**
